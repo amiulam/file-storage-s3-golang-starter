@@ -34,6 +34,10 @@ func (c Client) GetUsers() ([]User, error) {
 	}
 	defer rows.Close()
 
+	if err := rows.Err(); err != nil {
+    return nil, err
+	}
+
 	users := []User{}
 	for rows.Next() {
 		var user User

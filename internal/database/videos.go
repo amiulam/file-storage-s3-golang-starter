@@ -45,6 +45,10 @@ func (c Client) GetVideos(userID uuid.UUID) ([]Video, error) {
 	}
 	defer rows.Close()
 
+	if err := rows.Err(); err != nil {
+    return nil, err
+	}
+
 	videos := []Video{}
 	for rows.Next() {
 		var video Video
