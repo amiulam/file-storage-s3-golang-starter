@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
 	"errors"
@@ -35,25 +34,6 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	fmt.Println("uploading thumbnail for video", videoID, "by user", userID)
-
-	// TODO: implement the upload here
-	const maxMemory = 10 << 20
-
-	r.ParseMultipartForm(maxMemory)
-	if err := r.ParseMultipartForm(maxMemory); err != nil {
-		respondWithError(w, http.StatusBadRequest, "Couldn't parse multipart form", err)
-		return
-	}
-	defer r.MultipartForm.RemoveAll()
-
-	file, header, err := r.FormFile("thumbnail")
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Unable to parse form file", err)
-		return
-	}
-	defer file.Close()
-
 	video, err := cfg.db.GetVideo(videoID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -69,21 +49,37 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	fmt.Println("uploading thumbnail for video", videoID, "by user", userID)
+
+	const maxMemory = 10 << 20
+
+	err = r.ParseMultipartForm(maxMemory)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Couldn't parse multipart form", err)
+		return
+	}
+	defer r.MultipartForm.RemoveAll()
+
+	file, header, err := r.FormFile("thumbnail")
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Unable to parse form file", err)
+		return
+	}
+	defer file.Close()
+
 	contentType, _, err := mime.ParseMediaType(header.Header.Get("Content-Type"))
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid content type", err)
 		return
 	}
-
 	if contentType != "image/jpeg" && contentType != "image/png" {
 		respondWithError(w, http.StatusBadRequest, "Only JPEG and PNG thumbnails are supported", nil)
 		return
 	}
 
-	randomByte := make([]byte, 32)
-	_, err = rand.Read(randomByte)
+	randomByte, err := generateRandomByte()
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to generate filename", nil)
+		respondWithError(w, http.StatusInternalServerError, "Failed to generate filename", err)
 		return
 	}
 

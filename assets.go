@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,9 +35,21 @@ func mediaTypeToExt(mediaType string) string {
 		extension = ".jpg"
 	case "image/png":
 		extension = ".png"
+	case "video/mp4":
+		extension = ".mp4"
 	default:
 		extension = ".bin"
 	}
 
 	return extension
+}
+
+func generateRandomByte() ([]byte, error) {
+	randomByte := make([]byte, 32)
+	_, err := rand.Read(randomByte)
+	if err != nil {
+		return nil, err
+	}
+
+	return randomByte, nil
 }
