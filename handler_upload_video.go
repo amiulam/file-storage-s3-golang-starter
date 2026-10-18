@@ -94,10 +94,34 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	_, err = f.Seek(0, io.SeekStart)
+	// _, err = f.Seek(0, io.SeekStart)
+	// if err != nil {
+	// 	respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
+	// 	return
+	// }
+
+	outputPath, err := processVideoForFastStart(f.Name())
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
+		respondWithError(w, http.StatusInternalServerError, "Couldn't process video", err)
 		return
+	}
+	defer os.Remove(outputPath)
+
+	processedFile, err := os.Open(outputPath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't open processed video", err)
+		return
+	}
+	defer processedFile.Close()
+
+	ascpectRatio, err := getVideoAspectRatio(outputPath)
+
+	aspectRatioType := "other"
+	if ascpectRatio == "16:9" {
+		aspectRatioType = "landscape"
+	}
+	if ascpectRatio == "9:16" {
+		aspectRatioType = "portrait"
 	}
 
 	randomByte, err := generateRandomByte()
@@ -108,11 +132,12 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 
 	randomFileName := base64.RawURLEncoding.EncodeToString(randomByte)
 	fileName := getAssetWithExt(randomFileName, contentType)
+	objectKey := fmt.Sprintf("%s/%s", aspectRatioType, fileName)
 
 	_, err = cfg.s3Client.PutObject(r.Context(), &s3.PutObjectInput{
 		Bucket:      &cfg.s3Bucket,
-		Key:         &fileName,
-		Body:        f,
+		Key:         &objectKey,
+		Body:        processedFile,
 		ContentType: &contentType,
 	})
 	if err != nil {
@@ -120,7 +145,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	newVideoURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", cfg.s3Bucket, cfg.s3Region, fileName)
+	newVideoURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s/%s", cfg.s3Bucket, cfg.s3Region, aspectRatioType, fileName)
 	video.VideoURL = &newVideoURL
 
 	err = cfg.db.UpdateVideo(video)
@@ -130,5 +155,4 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 
 	respondWithJSON(w, http.StatusOK, video)
-
 }
