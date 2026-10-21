@@ -94,12 +94,6 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// _, err = f.Seek(0, io.SeekStart)
-	// if err != nil {
-	// 	respondWithError(w, http.StatusInternalServerError, "Something went wrong", err)
-	// 	return
-	// }
-
 	outputPath, err := processVideoForFastStart(f.Name())
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't process video", err)
@@ -145,7 +139,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	newVideoURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s/%s", cfg.s3Bucket, cfg.s3Region, aspectRatioType, fileName)
+	newVideoURL := fmt.Sprintf("%s,%s", cfg.s3Bucket, objectKey)
 	video.VideoURL = &newVideoURL
 
 	err = cfg.db.UpdateVideo(video)
@@ -154,5 +148,11 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, video)
+	convertedVideo, err := cfg.dbVideoToSignedVideo(video)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to generate presigned video url", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, convertedVideo)
 }
