@@ -2,13 +2,9 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -147,37 +143,4 @@ func main() {
 
 	log.Printf("Serving on: http://localhost:%s/app/\n", port)
 	log.Fatal(srv.ListenAndServe())
-}
-
-func generatePresignedURL(s3Client *s3.Client, bucket, key string, expireTime time.Duration) (string, error) {
-	presignClient := s3.NewPresignClient(s3Client)
-
-	presignReq, err := presignClient.PresignGetObject(context.Background(), &s3.GetObjectInput{
-		Bucket: &bucket,
-		Key:    &key,
-	}, s3.WithPresignExpires(expireTime))
-	if err != nil {
-		return "", err
-	}
-
-	return presignReq.URL, nil
-}
-
-func (cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video, error) {
-	if video.VideoURL == nil {
-		return video, nil
-	}
-	
-	splittedVideoUrl := strings.Split(*video.VideoURL, ",")
-	if len(splittedVideoUrl) != 2 {
-		return database.Video{}, errors.New("invalid video url")
-	}
-
-	presignedVideoURL, err := generatePresignedURL(cfg.s3Client, splittedVideoUrl[0], splittedVideoUrl[1], time.Hour)
-	if err != nil {
-		return database.Video{}, fmt.Errorf("failed to generate presigned url: %w", err)
-	}
-
-	video.VideoURL = &presignedVideoURL
-	return video, nil
 }
